@@ -36,8 +36,8 @@ try:
         # 失败后，使用分段解析的方法
         messages = []
         
-        # 替换转义斜杠，使JSON更易处理
-        json_str = json_str.replace('\/', '/')
+        # 替换转义斜杠，使JSON更易处理 - 修复无效的转义序列
+        json_str = json_str.replace('\\/', '/')  # 使用双反斜杠作为转义符
         
         # 从字符串中提取每个消息对象
         # 首先找到所有 "send_type":number 的位置，这标志着每个消息的开始
@@ -56,6 +56,12 @@ try:
             # 提取基本信息
             send_type_match = re.search(r'"send_type":(\d+)', msg_json)
             create_time_match = re.search(r'"create_time":"([^"]+)"', msg_json)
+            
+            # 提取msg_type (如果存在)
+            msg_type = 0  # 默认为0
+            msg_type_match = re.search(r'"msg_type":(\d+)', msg_json)
+            if msg_type_match:
+                msg_type = int(msg_type_match.group(1))
             
             if send_type_match and create_time_match:
                 send_type = int(send_type_match.group(1))
@@ -80,6 +86,7 @@ try:
                     messages.append({
                         'send_type': send_type,
                         'create_time': create_time,
+                        'msg_type': msg_type,
                         'msg_content': msg_content
                     })
         
@@ -124,6 +131,7 @@ except Exception as e:
 for msg in conv:
     sender = "User" if msg['send_type'] == 1 else "Assistant"
     timestamp = msg.get('create_time')
+    msg_type = msg.get('msg_type', 0)  # 获取消息类型，默认为0
     content = msg.get('msg_content', '')
     
     # 移除前缀
@@ -144,10 +152,12 @@ for msg in conv:
 
     with st.container():
         if sender == "User":
-            st.markdown(f"**🧑 User** [{timestamp}]: ")
+            # 显示包含msg_type的标题
+            st.markdown(f"**🧑 User** [{timestamp}] [类型: {msg_type}]: ")
             st.code(content_display, language="json" if content_display.strip().startswith('{') else None)
         else:
-            st.markdown(f"**🤖 Assistant** [{timestamp}]: ")
+            # 显示包含msg_type的标题
+            st.markdown(f"**🤖 Assistant** [{timestamp}] [类型: {msg_type}]: ")
             st.write(content_display)
 
 # Footer
